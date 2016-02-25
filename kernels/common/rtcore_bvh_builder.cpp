@@ -38,7 +38,8 @@ RTCORE_API void *rtcBVHBuilderAllocator(void *allocator, const size_t size) {
 RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize,
 		rtcBVHBuilderNodeAllocFunc nodeAllocFunc,
 		rtcBVHBuilderLeafAllocFunc leafAllocFunc,
-		rtcBVHBuilderNodeChildrenPtrFunc nodeChildrenPtrFunc) {
+		rtcBVHBuilderNodeChildrenPtrFunc nodeChildrenPtrFunc,
+		rtcBVHBuilderNodeChildrenSetBBoxFunc nodeChildrenSetBBoxFunc) {
 	/* fast allocator that supports thread local operation */
 	FastAllocator allocator(nullptr);
 
@@ -60,9 +61,11 @@ RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t pr
 			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, isa::BVHBuilderBinnedSAH::BuildRecord *children, const size_t N, FastAllocator::ThreadLocal *alloc) -> int {
 				assert(N <= 2);
 				
-				void *node = (*nodeAllocFunc)(alloc);
-				for (size_t i = 0; i < N; i++)
+				void *node = (*nodeAllocFunc)();
+				for (size_t i = 0; i < N; i++) {
+					nodeChildrenSetBBoxFunc(node, i, &children[i].pinfo.geomBounds.lower.x, &children[i].pinfo.geomBounds.upper.x);
 					children[i].parent = (size_t *)nodeChildrenPtrFunc(node, i);
+				}
 				*current.parent = (size_t)node;
 
 				return 0;
@@ -72,8 +75,8 @@ RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t pr
 			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, FastAllocator::ThreadLocal *alloc) -> int {
 				assert(current.prims.size() == 1);
 
-				void *node = (*leafAllocFunc)(alloc, &prims[current.prims.begin()]);
-				*current.parent = (size_t)node;
+				void *leaf = (*leafAllocFunc)(&prims[current.prims.begin()]);
+				*current.parent = (size_t)leaf;
 
 				return 0;
 			},
@@ -85,7 +88,7 @@ RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t pr
 
 			(PrimRef *)prims, primsInfo, 2, 1024, 1, 1, 1, 1.f, 1.f);
 
-	return NULL;
+	return root;
 }
 
 }

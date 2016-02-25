@@ -28,14 +28,16 @@ struct RTCORE_ALIGN(32) RTCPrimRef
 
 RTCORE_API void *rtcBVHBuilderAllocator(void *allocator, const size_t size);
 
-typedef void *(*rtcBVHBuilderNodeAllocFunc)(void *allocator);
-typedef void *(*rtcBVHBuilderLeafAllocFunc)(void *allocator, const RTCPrimRef *prim);
+typedef void *(*rtcBVHBuilderNodeAllocFunc)();
+typedef void *(*rtcBVHBuilderLeafAllocFunc)(const RTCPrimRef *prim);
 typedef void *(*rtcBVHBuilderNodeChildrenPtrFunc)(void *node, const size_t i);
-
+typedef void *(*rtcBVHBuilderNodeChildrenSetBBoxFunc)(void *node, const size_t i,
+		const float lower[3], const float upper[3]);
 
 RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize,
 		rtcBVHBuilderNodeAllocFunc nodeAllocFunc,
 		rtcBVHBuilderLeafAllocFunc leafAllocFunc,
-		rtcBVHBuilderNodeChildrenPtrFunc nodeChildrenPtrFunc);
+		rtcBVHBuilderNodeChildrenPtrFunc nodeChildrenPtrFunc,
+		rtcBVHBuilderNodeChildrenSetBBoxFunc nodeChildrenSetBBoxFunc);
 
 #endif
