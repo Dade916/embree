@@ -106,7 +106,7 @@ static void *NodeChildrenPtrFunc(void *n, const size_t i) {
 	return &node->children[i];
 }
 
-static void *NodeChildrenSetBBoxFunc(void *n, const size_t i, const float lower[3], const float upper[3]) {
+static void NodeChildrenSetBBoxFunc(void *n, const size_t i, const float lower[3], const float upper[3]) {
 	InnerNode *node = (InnerNode *)n;
 
 	node->bounds[i].lower.x = lower[0];

@@ -31,7 +31,7 @@ RTCORE_API void *rtcBVHBuilderAllocator(void *allocator, const size_t size);
 typedef void *(*rtcBVHBuilderNodeAllocFunc)();
 typedef void *(*rtcBVHBuilderLeafAllocFunc)(const RTCPrimRef *prim);
 typedef void *(*rtcBVHBuilderNodeChildrenPtrFunc)(void *node, const size_t i);
-typedef void *(*rtcBVHBuilderNodeChildrenSetBBoxFunc)(void *node, const size_t i,
+typedef void (*rtcBVHBuilderNodeChildrenSetBBoxFunc)(void *node, const size_t i,
 		const float lower[3], const float upper[3]);
 
 RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize,
