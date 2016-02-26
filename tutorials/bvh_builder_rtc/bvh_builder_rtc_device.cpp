@@ -147,6 +147,8 @@ void build_sah(avector<RTCPrimRef>& prims) {
 		double t1 = getSeconds();
 		std::cout << 1000.0f * (t1 - t0) << "ms, " << 1E-6 * double(prims.size()) / (t1 - t0) << " Mprims/s, sah = " << root->sah() << " [DONE]" << std::endl;
 	}
+
+	rtcDeleteAllocator(fastAllocator);
 }
 
 //------------------------------------------------------------------------------
