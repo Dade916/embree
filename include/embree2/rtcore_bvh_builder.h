@@ -17,6 +17,17 @@
 #ifndef __RTCORE_BVH_BUILDER_H__
 #define __RTCORE_BVH_BUILDER_H__
 
+/*! \brief Defines an opaque memory allocator type */
+typedef struct __RTCAllocator {}* RTCAllocator;
+/*! \brief Defines an opaque memory thread local allocator type */
+typedef struct __RTCThreadLocalAllocator {}* RTCThreadLocalAllocator;
+
+RTCORE_API RTCAllocator rtcNewAllocator();
+RTCORE_API void rtcDeleteAllocator(RTCAllocator allocator);
+RTCORE_API void rtcResetAllocator(RTCAllocator allocator);
+RTCORE_API RTCThreadLocalAllocator rtcNewThreadAllocator(RTCAllocator allocator);
+RTCORE_API void *rtcThreadAlloc(RTCThreadLocalAllocator allocator, const size_t size);
+
 /*! Axis aligned bounding box representation plus geomID and primID */
 struct RTCORE_ALIGN(32) RTCPrimRef
 {
@@ -26,18 +37,18 @@ struct RTCORE_ALIGN(32) RTCPrimRef
 	int primID;
 };
 
-RTCORE_API void *rtcBVHBuilderAllocator(void *allocator, const size_t size);
-
-typedef void *(*rtcBVHBuilderNodeAllocFunc)();
-typedef void *(*rtcBVHBuilderLeafAllocFunc)(const RTCPrimRef *prim);
-typedef void *(*rtcBVHBuilderNodeChildrenPtrFunc)(void *node, const size_t i);
-typedef void (*rtcBVHBuilderNodeChildrenSetBBoxFunc)(void *node, const size_t i,
+typedef void *(*rtcBVHBuilderCreateAllocFunc)(void *userData);
+typedef void *(*rtcBVHBuilderCreateNodeFunc)(void *allocator);
+typedef void *(*rtcBVHBuilderCreateLeafFunc)(void *allocator, const RTCPrimRef *prim);
+typedef void *(*rtcBVHBuilderGetNodeChildrenPtrFunc)(void *node, const size_t i);
+typedef void (*rtcBVHBuilderGetNodeChildrenBBoxFunc)(void *node, const size_t i,
 		const float lower[3], const float upper[3]);
 
-RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize,
-		rtcBVHBuilderNodeAllocFunc nodeAllocFunc,
-		rtcBVHBuilderLeafAllocFunc leafAllocFunc,
-		rtcBVHBuilderNodeChildrenPtrFunc nodeChildrenPtrFunc,
-		rtcBVHBuilderNodeChildrenSetBBoxFunc nodeChildrenSetBBoxFunc);
+RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize, void *userData,
+		rtcBVHBuilderCreateAllocFunc allocFunc,
+		rtcBVHBuilderCreateNodeFunc createNodeFunc,
+		rtcBVHBuilderCreateLeafFunc createLeafFunc,
+		rtcBVHBuilderGetNodeChildrenPtrFunc getNodeChildrenPtrFunc,
+		rtcBVHBuilderGetNodeChildrenBBoxFunc getNodeChildrenBBoxFunc);
 
 #endif

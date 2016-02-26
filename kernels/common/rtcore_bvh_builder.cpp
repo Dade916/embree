@@ -29,20 +29,46 @@
 
 namespace embree {
 
-RTCORE_API void *rtcBVHBuilderAllocator(void *allocator, const size_t size) {
-	FastAllocator::ThreadLocal *alloc = (FastAllocator::ThreadLocal *)allocator;
+//------------------------------------------------------------------------------
+// Memory related functions
+//------------------------------------------------------------------------------
 
-	return alloc->malloc(size);
+RTCORE_API RTCAllocator rtcNewAllocator() {
+	return (RTCAllocator) new FastAllocator(nullptr);
 }
 
-RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize,
-		rtcBVHBuilderNodeAllocFunc nodeAllocFunc,
-		rtcBVHBuilderLeafAllocFunc leafAllocFunc,
-		rtcBVHBuilderNodeChildrenPtrFunc nodeChildrenPtrFunc,
-		rtcBVHBuilderNodeChildrenSetBBoxFunc nodeChildrenSetBBoxFunc) {
-	/* fast allocator that supports thread local operation */
-	FastAllocator allocator(nullptr);
+RTCORE_API void rtcDeleteAllocator(RTCAllocator allocator) {
+	FastAllocator *fastAllocator = (FastAllocator *)allocator;
+	delete fastAllocator;
+}
 
+RTCORE_API void rtcResetAllocator(RTCAllocator allocator) {
+	FastAllocator *fastAllocator = (FastAllocator *)allocator;
+	fastAllocator->reset();
+}
+
+RTCORE_API RTCThreadLocalAllocator rtcNewThreadAllocator(RTCAllocator allocator) {
+	FastAllocator *fastAllocator = (FastAllocator *)allocator;
+
+	return (RTCThreadLocalAllocator) fastAllocator->threadLocal();
+}
+
+RTCORE_API void *rtcThreadAlloc(RTCThreadLocalAllocator allocator, const size_t size) {
+	FastAllocator::ThreadLocal *threadAllocator = (FastAllocator::ThreadLocal *)allocator;
+
+	return threadAllocator->malloc(size);
+}
+
+//------------------------------------------------------------------------------
+// BVH builder related functions
+//------------------------------------------------------------------------------
+
+RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize, void *userData,
+		rtcBVHBuilderCreateAllocFunc allocFunc,
+		rtcBVHBuilderCreateNodeFunc createNodeFunc,
+		rtcBVHBuilderCreateLeafFunc createLeafFunc,
+		rtcBVHBuilderGetNodeChildrenPtrFunc getNodeChildrenPtrFunc,
+		rtcBVHBuilderGetNodeChildrenBBoxFunc getNodeChildrenBBoxFunc) {
 	isa::PrimInfo primsInfo(empty);
 	for (size_t i = 0; i < primRefsSize; i++) {
 		const BBox3fa bbox(Vec3fa::load(&prims[i].lower_x), Vec3fa::load(&prims[i].upper_x));
@@ -53,18 +79,18 @@ RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t pr
 	isa::BVHBuilderBinnedSAH::build<void *>(
 			root,
 			/* thread local allocator for fast allocations */
-			[&] () -> FastAllocator::ThreadLocal * {
-				return allocator.threadLocal();
+			[&] () -> void * {
+				return allocFunc(userData);
 			},
 
 			/* lambda function that creates BVH nodes */
-			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, isa::BVHBuilderBinnedSAH::BuildRecord *children, const size_t N, FastAllocator::ThreadLocal *alloc) -> int {
+			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, isa::BVHBuilderBinnedSAH::BuildRecord *children, const size_t N, void *localAllocator) -> int {
 				assert(N <= 2);
 				
-				void *node = (*nodeAllocFunc)();
+				void *node = (*createNodeFunc)(localAllocator);
 				for (size_t i = 0; i < N; i++) {
-					nodeChildrenSetBBoxFunc(node, i, &children[i].pinfo.geomBounds.lower.x, &children[i].pinfo.geomBounds.upper.x);
-					children[i].parent = (size_t *)nodeChildrenPtrFunc(node, i);
+					getNodeChildrenBBoxFunc(node, i, &children[i].pinfo.geomBounds.lower.x, &children[i].pinfo.geomBounds.upper.x);
+					children[i].parent = (size_t *)getNodeChildrenPtrFunc(node, i);
 				}
 				*current.parent = (size_t)node;
 
@@ -72,10 +98,10 @@ RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t pr
 			},
 
 			/* lambda function that creates BVH leaves */
-			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, FastAllocator::ThreadLocal *alloc) -> int {
+			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, void *localAllocator) -> int {
 				assert(current.prims.size() == 1);
 
-				void *leaf = (*leafAllocFunc)(&prims[current.prims.begin()]);
+				void *leaf = (*createLeafFunc)(localAllocator, &prims[current.prims.begin()]);
 				*current.parent = (size_t)leaf;
 
 				return 0;

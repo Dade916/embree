@@ -14,6 +14,8 @@
 // limitations under the License.                                           //
 // ======================================================================== //
 
+#include <functional>
+
 #include "../common/tutorial/tutorial_device.h"
 #include "../../kernels/common/alloc.h"
 #include "../../include/embree2/rtcore_bvh_builder.h"
@@ -91,14 +93,24 @@ struct LeafNode : public Node
   }
 };
 
-static void *NodeAllocFunc() {
-	return new InnerNode();
+//------------------------------------------------------------------------------
+
+static void *CreateAllocFunc(void *userData) {
+	RTCAllocator fastAllocator = *((RTCAllocator *)userData);
+
+	return rtcNewThreadAllocator(fastAllocator);
 }
 
-static void *LeafAllocFunc(const RTCPrimRef *prim) {
+static void *CreateNodeFunc(void *localAllocator) {
+	RTCThreadLocalAllocator fastLocalAllocator = (RTCThreadLocalAllocator)localAllocator;
+	return new (rtcThreadAlloc(fastLocalAllocator, sizeof(InnerNode))) InnerNode();
+}
+
+static void *CreateLeafFunc(void *localAllocator, const RTCPrimRef *prim) {
+	RTCThreadLocalAllocator fastLocalAllocator = (RTCThreadLocalAllocator)localAllocator;
 	const BBox3fa bbox(Vec3fa::load(&prim->lower_x), Vec3fa::load(&prim->upper_x));
 
-	return new LeafNode(size_t(prim->geomID) + (size_t(prim->primID) << 32), bbox);
+	return new (rtcThreadAlloc(fastLocalAllocator, sizeof(LeafNode))) LeafNode(size_t(prim->geomID) + (size_t(prim->primID) << 32), bbox);
 }
 
 static void *NodeChildrenPtrFunc(void *n, const size_t i) {
@@ -118,22 +130,70 @@ static void NodeChildrenSetBBoxFunc(void *n, const size_t i, const float lower[3
 	node->bounds[i].upper.z = upper[2];
 }
 
-void build_sah(avector<RTCPrimRef>& prims)
-{
-  for (size_t i=0; i<2; i++)
-  {
-    std::cout << "iteration " << i << ": building BVH over " << prims.size() << " primitives, " << std::flush;
-    double t0 = getSeconds();
+void build_sah(avector<RTCPrimRef>& prims) {
+	RTCAllocator fastAllocator = rtcNewAllocator();
 
-    Node *root = (Node *)rtcBVHBuilderBinnedSAH(&prims[0], prims.size(),
-			&NodeAllocFunc, &LeafAllocFunc, &NodeChildrenPtrFunc, &NodeChildrenSetBBoxFunc);
+	for (size_t i = 0; i < 2; i++) {
+		std::cout << "iteration " << i << ": building BVH over " << prims.size() << " primitives, " << std::flush;
+		double t0 = getSeconds();
 
-    double t1 = getSeconds();
-    std::cout << 1000.0f*(t1-t0) << "ms, " << 1E-6*double(prims.size())/(t1-t0) << " Mprims/s, sah = " << root->sah() << " [DONE]" << std::endl;
+		rtcResetAllocator(fastAllocator);
 
-	// TODO: delete the BVH tree pointed by root
-  }
+		Node *root = (Node *) rtcBVHBuilderBinnedSAH(&prims[0], prims.size(),
+				&fastAllocator,
+				&CreateAllocFunc, &CreateNodeFunc, &CreateLeafFunc,
+				&NodeChildrenPtrFunc, &NodeChildrenSetBBoxFunc);
+
+		double t1 = getSeconds();
+		std::cout << 1000.0f * (t1 - t0) << "ms, " << 1E-6 * double(prims.size()) / (t1 - t0) << " Mprims/s, sah = " << root->sah() << " [DONE]" << std::endl;
+	}
 }
+
+//------------------------------------------------------------------------------
+
+static void *CreateAllocSystemAllocatorFunc(void *userData) {
+	return NULL;
+}
+
+static void *CreateNodeSystemAllocatorFunc(void *localAllocator) {
+	return new InnerNode();
+}
+
+static void *CreateLeafSystemAllocatorFunc(void *localAllocator, const RTCPrimRef *prim) {
+	const BBox3fa bbox(Vec3fa::load(&prim->lower_x), Vec3fa::load(&prim->upper_x));
+
+	return new LeafNode(size_t(prim->geomID) + (size_t(prim->primID) << 32), bbox);
+}
+
+static void FreeTree(Node *node) {
+	InnerNode *innerNode = dynamic_cast<InnerNode *>(node);
+	if (innerNode) {
+		FreeTree(innerNode->children[0]);
+		FreeTree(innerNode->children[1]);
+	}
+
+	delete node;
+}
+
+void build_sah_system_memory(avector<RTCPrimRef>& prims) {
+	for (size_t i = 0; i < 2; i++) {
+		std::cout << "iteration " << i << ": building BVH over " << prims.size() << " primitives, " << std::flush;
+		double t0 = getSeconds();
+
+		Node *root = (Node *) rtcBVHBuilderBinnedSAH(&prims[0], prims.size(),
+				NULL,
+				&CreateAllocSystemAllocatorFunc, &CreateNodeSystemAllocatorFunc, &CreateLeafSystemAllocatorFunc,
+				&NodeChildrenPtrFunc, &NodeChildrenSetBBoxFunc);
+
+		double t1 = getSeconds();
+		std::cout << 1000.0f * (t1 - t0) << "ms, " << 1E-6 * double(prims.size()) / (t1 - t0) << " Mprims/s, sah = " << root->sah() << " [DONE]" << std::endl;
+
+		// Free the allocated memory
+		FreeTree(root);
+	}
+}
+
+//------------------------------------------------------------------------------
 
 /* called by the C++ code for initialization */
 extern "C" void device_init (char* cfg)
@@ -168,6 +228,9 @@ extern "C" void device_init (char* cfg)
     prims.push_back(prim);
   }
 
+  std::cout << "Build SAH with system memory allocator" << std::endl;
+  build_sah_system_memory(prims);
+  std::cout << "Build SAH with RTC allocator" << std::endl;
   build_sah(prims);
 }
 
