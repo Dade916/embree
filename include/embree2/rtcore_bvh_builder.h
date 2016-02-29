@@ -37,15 +37,15 @@ struct RTCORE_ALIGN(32) RTCPrimRef
 	int primID;
 };
 
-typedef void *(*rtcBVHBuilderCreateAllocFunc)(void *userData);
-typedef void *(*rtcBVHBuilderCreateNodeFunc)(void *allocator);
-typedef void *(*rtcBVHBuilderCreateLeafFunc)(void *allocator, const RTCPrimRef *prim);
+typedef void *(*rtcBVHBuilderCreateLocalThreadDataFunc)(void *userGlobalData);
+typedef void *(*rtcBVHBuilderCreateNodeFunc)(void *userLocalThreadData);
+typedef void *(*rtcBVHBuilderCreateLeafFunc)(void *userLocalThreadData, const RTCPrimRef *prim);
 typedef void *(*rtcBVHBuilderGetNodeChildrenPtrFunc)(void *node, const size_t i);
 typedef void (*rtcBVHBuilderGetNodeChildrenBBoxFunc)(void *node, const size_t i,
 		const float lower[3], const float upper[3]);
 
 RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize, void *userData,
-		rtcBVHBuilderCreateAllocFunc allocFunc,
+		rtcBVHBuilderCreateLocalThreadDataFunc createLocalThreadDataFunc,
 		rtcBVHBuilderCreateNodeFunc createNodeFunc,
 		rtcBVHBuilderCreateLeafFunc createLeafFunc,
 		rtcBVHBuilderGetNodeChildrenPtrFunc getNodeChildrenPtrFunc,

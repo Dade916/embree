@@ -63,8 +63,8 @@ RTCORE_API void *rtcThreadAlloc(RTCThreadLocalAllocator allocator, const size_t 
 // BVH builder related functions
 //------------------------------------------------------------------------------
 
-RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize, void *userData,
-		rtcBVHBuilderCreateAllocFunc allocFunc,
+RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize, void *userGlobalData,
+		rtcBVHBuilderCreateLocalThreadDataFunc createLocalThreadDataFunc,
 		rtcBVHBuilderCreateNodeFunc createNodeFunc,
 		rtcBVHBuilderCreateLeafFunc createLeafFunc,
 		rtcBVHBuilderGetNodeChildrenPtrFunc getNodeChildrenPtrFunc,
@@ -80,14 +80,14 @@ RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t pr
 			root,
 			/* thread local allocator for fast allocations */
 			[&] () -> void * {
-				return allocFunc(userData);
+				return createLocalThreadDataFunc(userGlobalData);
 			},
 
 			/* lambda function that creates BVH nodes */
-			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, isa::BVHBuilderBinnedSAH::BuildRecord *children, const size_t N, void *localAllocator) -> int {
+			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, isa::BVHBuilderBinnedSAH::BuildRecord *children, const size_t N, void *userLocalThreadData) -> int {
 				assert(N <= 2);
 				
-				void *node = (*createNodeFunc)(localAllocator);
+				void *node = (*createNodeFunc)(userLocalThreadData);
 				for (size_t i = 0; i < N; i++) {
 					getNodeChildrenBBoxFunc(node, i, &children[i].pinfo.geomBounds.lower.x, &children[i].pinfo.geomBounds.upper.x);
 					children[i].parent = (size_t *)getNodeChildrenPtrFunc(node, i);
@@ -98,10 +98,10 @@ RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t pr
 			},
 
 			/* lambda function that creates BVH leaves */
-			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, void *localAllocator) -> int {
+			[&](const isa::BVHBuilderBinnedSAH::BuildRecord &current, void *userLocalThreadData) -> int {
 				assert(current.prims.size() == 1);
 
-				void *leaf = (*createLeafFunc)(localAllocator, &prims[current.prims.begin()]);
+				void *leaf = (*createLeafFunc)(userLocalThreadData, &prims[current.prims.begin()]);
 				*current.parent = (size_t)leaf;
 
 				return 0;
