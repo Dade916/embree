@@ -28,6 +28,14 @@ RTCORE_API void rtcResetAllocator(RTCAllocator allocator);
 RTCORE_API RTCThreadLocalAllocator rtcNewThreadAllocator(RTCAllocator allocator);
 RTCORE_API void *rtcThreadAlloc(RTCThreadLocalAllocator allocator, const size_t size);
 
+struct RTCBVHBuilderConfig
+{
+	size_t branchingFactor, maxDepth, blockSize, minLeafSize, maxLeafSize;
+	float travCost, intCost;
+};
+
+RTCORE_API void rtcDefaultBVHBuilderConfig(RTCBVHBuilderConfig *config);
+
 /*! Axis aligned bounding box representation plus geomID and primID */
 struct RTCORE_ALIGN(32) RTCPrimRef
 {
@@ -44,7 +52,7 @@ typedef void *(*rtcBVHBuilderGetNodeChildrenPtrFunc)(void *node, const size_t i)
 typedef void (*rtcBVHBuilderGetNodeChildrenBBoxFunc)(void *node, const size_t i,
 		const float lower[3], const float upper[3]);
 
-RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize, void *userData,
+RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCBVHBuilderConfig *config, const RTCPrimRef *prims, const size_t primRefsSize, void *userData,
 		rtcBVHBuilderCreateLocalThreadDataFunc createLocalThreadDataFunc,
 		rtcBVHBuilderCreateNodeFunc createNodeFunc,
 		rtcBVHBuilderCreateLeafFunc createLeafFunc,

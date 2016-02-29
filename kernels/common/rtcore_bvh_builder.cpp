@@ -63,7 +63,18 @@ RTCORE_API void *rtcThreadAlloc(RTCThreadLocalAllocator allocator, const size_t 
 // BVH builder related functions
 //------------------------------------------------------------------------------
 
-RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t primRefsSize, void *userGlobalData,
+RTCORE_API void rtcDefaultBVHBuilderConfig(RTCBVHBuilderConfig *config) {
+	config->branchingFactor = 2;
+	config->maxDepth = 1024;
+	config->blockSize = 1;
+	config->minLeafSize = 1;
+	config->maxLeafSize = 1;
+	config->travCost = 1.f;
+	config->intCost = 1.f;
+}
+
+RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCBVHBuilderConfig *config, 
+		const RTCPrimRef *prims, const size_t primRefsSize, void *userGlobalData,
 		rtcBVHBuilderCreateLocalThreadDataFunc createLocalThreadDataFunc,
 		rtcBVHBuilderCreateNodeFunc createNodeFunc,
 		rtcBVHBuilderCreateLeafFunc createLeafFunc,
@@ -112,7 +123,14 @@ RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCPrimRef *prims, const size_t pr
 				// throw an exception here to cancel the build operation
 			},
 
-			(PrimRef *)prims, primsInfo, 2, 1024, 1, 1, 1, 1.f, 1.f);
+			(PrimRef *)prims, primsInfo,
+			config->branchingFactor,
+			config->maxDepth,
+			config->blockSize,
+			config->minLeafSize,
+			config->maxLeafSize,
+			config->travCost,
+			config->intCost);
 
 	return root;
 }

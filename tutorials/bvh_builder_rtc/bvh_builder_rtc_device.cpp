@@ -139,7 +139,11 @@ void build_sah(avector<RTCPrimRef>& prims) {
 
 		rtcResetAllocator(fastAllocator);
 
-		Node *root = (Node *) rtcBVHBuilderBinnedSAH(&prims[0], prims.size(),
+		RTCBVHBuilderConfig config;
+		rtcDefaultBVHBuilderConfig(&config);
+
+		Node *root = (Node *) rtcBVHBuilderBinnedSAH(&config,
+				&prims[0], prims.size(),
 				&fastAllocator,
 				&CreateAllocFunc, &CreateNodeFunc, &CreateLeafFunc,
 				&NodeChildrenPtrFunc, &NodeChildrenSetBBoxFunc);
@@ -182,7 +186,11 @@ void build_sah_system_memory(avector<RTCPrimRef>& prims) {
 		std::cout << "iteration " << i << ": building BVH over " << prims.size() << " primitives, " << std::flush;
 		double t0 = getSeconds();
 
-		Node *root = (Node *) rtcBVHBuilderBinnedSAH(&prims[0], prims.size(),
+		RTCBVHBuilderConfig config;
+		rtcDefaultBVHBuilderConfig(&config);
+
+		Node *root = (Node *) rtcBVHBuilderBinnedSAH(&config,
+				&prims[0], prims.size(),
 				NULL,
 				&CreateAllocSystemAllocatorFunc, &CreateNodeSystemAllocatorFunc, &CreateLeafSystemAllocatorFunc,
 				&NodeChildrenPtrFunc, &NodeChildrenSetBBoxFunc);
