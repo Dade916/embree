@@ -47,12 +47,19 @@ struct RTCORE_ALIGN(32) RTCPrimRef
 
 typedef void *(*rtcBVHBuilderCreateLocalThreadDataFunc)(void *userGlobalData);
 typedef void *(*rtcBVHBuilderCreateNodeFunc)(void *userLocalThreadData);
-typedef void *(*rtcBVHBuilderCreateLeafFunc)(void *userLocalThreadData, const RTCPrimRef *prim);
+typedef void *(*rtcBVHBuilderCreateLeafFunc)(void *userLocalThreadData, int geomID, int primID, const float lower[3], const float upper[3]);
 typedef void *(*rtcBVHBuilderGetNodeChildrenPtrFunc)(void *node, const size_t i);
 typedef void (*rtcBVHBuilderGetNodeChildrenBBoxFunc)(void *node, const size_t i,
 		const float lower[3], const float upper[3]);
 
 RTCORE_API void *rtcBVHBuilderBinnedSAH(const RTCBVHBuilderConfig *config, const RTCPrimRef *prims, const size_t primRefsSize, void *userData,
+		rtcBVHBuilderCreateLocalThreadDataFunc createLocalThreadDataFunc,
+		rtcBVHBuilderCreateNodeFunc createNodeFunc,
+		rtcBVHBuilderCreateLeafFunc createLeafFunc,
+		rtcBVHBuilderGetNodeChildrenPtrFunc getNodeChildrenPtrFunc,
+		rtcBVHBuilderGetNodeChildrenBBoxFunc getNodeChildrenBBoxFunc);
+
+RTCORE_API void *rtcBVHBuilderMorton(const RTCBVHBuilderConfig *config, const RTCPrimRef *prims, const size_t primRefsSize, void *userData,
 		rtcBVHBuilderCreateLocalThreadDataFunc createLocalThreadDataFunc,
 		rtcBVHBuilderCreateNodeFunc createNodeFunc,
 		rtcBVHBuilderCreateLeafFunc createLeafFunc,

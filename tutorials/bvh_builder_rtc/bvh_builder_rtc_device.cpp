@@ -106,11 +106,12 @@ static void *CreateNodeFunc(void *localAllocator) {
 	return new (rtcThreadAlloc(fastLocalAllocator, sizeof(InnerNode))) InnerNode();
 }
 
-static void *CreateLeafFunc(void *localAllocator, const RTCPrimRef *prim) {
+static void *CreateLeafFunc(void *localAllocator, const int geomID, const int primID,
+		const float lower[3], const float upper[3]) {
 	RTCThreadLocalAllocator fastLocalAllocator = (RTCThreadLocalAllocator)localAllocator;
-	const BBox3fa bbox(Vec3fa::load(&prim->lower_x), Vec3fa::load(&prim->upper_x));
+	const BBox3fa bbox(Vec3fa::load(lower), Vec3fa::load(upper));
 
-	return new (rtcThreadAlloc(fastLocalAllocator, sizeof(LeafNode))) LeafNode(size_t(prim->geomID) + (size_t(prim->primID) << 32), bbox);
+	return new (rtcThreadAlloc(fastLocalAllocator, sizeof(LeafNode))) LeafNode(size_t(geomID) + (size_t(primID) << 32), bbox);
 }
 
 static void *NodeChildrenPtrFunc(void *n, const size_t i) {
@@ -165,10 +166,11 @@ static void *CreateNodeSystemAllocatorFunc(void *localAllocator) {
 	return new InnerNode();
 }
 
-static void *CreateLeafSystemAllocatorFunc(void *localAllocator, const RTCPrimRef *prim) {
-	const BBox3fa bbox(Vec3fa::load(&prim->lower_x), Vec3fa::load(&prim->upper_x));
+static void *CreateLeafSystemAllocatorFunc(void *localAllocator, const int geomID, const int primID,
+		const float lower[3], const float upper[3]) {
+	const BBox3fa bbox(Vec3fa::load(lower), Vec3fa::load(upper));
 
-	return new LeafNode(size_t(prim->geomID) + (size_t(prim->primID) << 32), bbox);
+	return new LeafNode(size_t(geomID) + (size_t(primID) << 32), bbox);
 }
 
 static void FreeTree(Node *node) {
@@ -179,6 +181,33 @@ static void FreeTree(Node *node) {
 	}
 
 	delete node;
+}
+
+//------------------------------------------------------------------------------
+
+void build_morton(avector<RTCPrimRef>& prims) {
+	RTCAllocator fastAllocator = rtcNewAllocator();
+
+	for (size_t i = 0; i < 2; i++) {
+		std::cout << "iteration " << i << ": building BVH over " << prims.size() << " primitives, " << std::flush;
+		double t0 = getSeconds();
+
+		rtcResetAllocator(fastAllocator);
+
+		RTCBVHBuilderConfig config;
+		rtcDefaultBVHBuilderConfig(&config);
+
+		Node *root = (Node *) rtcBVHBuilderMorton(&config,
+				&prims[0], prims.size(),
+				&fastAllocator,
+				&CreateAllocFunc, &CreateNodeFunc, &CreateLeafFunc,
+				&NodeChildrenPtrFunc, &NodeChildrenSetBBoxFunc);
+
+		double t1 = getSeconds();
+		std::cout << 1000.0f * (t1 - t0) << "ms, " << 1E-6 * double(prims.size()) / (t1 - t0) << " Mprims/s, sah = " << root->sah() << " [DONE]" << std::endl;
+	}
+
+	rtcDeleteAllocator(fastAllocator);
 }
 
 void build_sah_system_memory(avector<RTCPrimRef>& prims) {
@@ -242,6 +271,8 @@ extern "C" void device_init (char* cfg)
   build_sah_system_memory(prims);
   std::cout << "Build SAH with RTC allocator" << std::endl;
   build_sah(prims);
+  std::cout << "Build Morton with RTC allocator" << std::endl;
+  build_morton(prims);
 }
 
 /* task that renders a single screen tile */
