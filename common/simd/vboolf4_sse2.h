@@ -113,7 +113,7 @@ namespace embree
   __forceinline const vboolf4 unpackhi( const vboolf4& a, const vboolf4& b ) { return _mm_unpackhi_ps(a, b); }
 
   template<size_t i0, size_t i1, size_t i2, size_t i3> __forceinline const vboolf4 shuffle( const vboolf4& a ) {
-    return _mm_shuffle_epi32(a, _MM_SHUFFLE(i3, i2, i1, i0));
+    return (const vboolf4)_mm_shuffle_epi32(a, _MM_SHUFFLE(i3, i2, i1, i0));
   }
 
   template<size_t i0, size_t i1, size_t i2, size_t i3> __forceinline const vboolf4 shuffle( const vboolf4& a, const vboolf4& b ) {
